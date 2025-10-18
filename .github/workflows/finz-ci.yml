@@ -2,7 +2,7 @@ name: Continuous Integration for CICD Project
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ dev-ci-cd ]
 
 jobs:
   build:
