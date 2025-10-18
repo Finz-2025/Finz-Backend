@@ -1,0 +1,33 @@
+name: Continuous Integration for CICD Project
+
+on:
+  pull_request:
+    branches: [ main, dev-ci-cd ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'corretto'
+          cache: gradle
+
+      # - name: 🛠️ Create application.yml from secrets
+      #   run: |
+      #     mkdir -p ./src/main/resources
+      #     echo "${{ secrets.APPLICATION_YML }}" > ./src/main/resources/application.yml
+
+      - name: 🤝 Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+        shell: bash
+
+      - name: 🧱 Build
+        run: ./gradlew build
+        shell: bash
