@@ -1,0 +1,65 @@
+name: Finz CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+
+jobs:
+  deploy:
+    name: Code deployment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle (skip tests)
+        run: ./gradlew build -x test
+
+      - name: Prepare deploy directory
+        run: |
+          mkdir -p deploy/nonstop
+          cp ./build/libs/*.jar ./deploy/
+          cp ./appspec.yml ./deploy/
+          cp ./scripts/deploy.sh ./deploy/nonstop/
+          cp ./scripts/switch.sh ./deploy/nonstop/
+          cp ./scripts/permission.sh ./deploy/nonstop/
+
+      - name: Make zip file
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          zip -r finz-cicd-codedeploy-$TIMESTAMP.zip ./deploy
+          echo "DEPLOY_FILE=finz-cicd-codedeploy-$TIMESTAMP.zip" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Upload deployment package to S3
+        run: aws s3 cp ./$DEPLOY_FILE s3://$S3_BUCKET_NAME/ --region ap-northeast-2
+
+      - name: Create CodeDeploy deployment
+        run: |
+          aws deploy create-deployment \
+            --application-name finz-cicd-codedeploy \
+            --deployment-group-name finz-cicd-codedeploy-group \
+            --file-exists-behavior OVERWRITE \
+            --s3-location bucket=${{ secrets.S3_BUCKET_NAME }},bundleType=zip,key=$DEPLOY_FILE \
+            --region ap-northeast-2
