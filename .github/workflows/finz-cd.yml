@@ -2,7 +2,7 @@ name: Finz CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ finz-deploy ]
 
 env:
   S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
