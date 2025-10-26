@@ -8,6 +8,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 public class ExpenseRequestDto {
     private Long user_id;
+    private String expense_name;
     private Integer amount;
     private String category;
     private String expense_tag;

@@ -27,6 +27,9 @@ public class Expense {
     @JoinColumn(name = "user_id", nullable = false) // user_id 컬럼으로 User와 조인
     private User user;
 
+    @Column(name = "expense_name", length = 20, nullable = false)
+    private String expenseName;
+
     @Column(name = "amount", nullable = false)
     private Integer amount;
 
@@ -56,9 +59,10 @@ public class Expense {
     private LocalDateTime updatedAt;
 
     @Builder
-    public Expense(User user, Integer amount, ExpenseCategory category, String expenseTag,
+    public Expense(User user, String expenseName, Integer amount, ExpenseCategory category, String expenseTag,
                    String memo, PaymentMethod paymentMethod, LocalDate expenseDate) {
         this.user = user;
+        this.expenseName = expenseName;
         this.amount = amount;
         this.category = category;
         this.expenseTag = expenseTag;

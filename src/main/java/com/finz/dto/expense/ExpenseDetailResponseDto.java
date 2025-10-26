@@ -10,6 +10,9 @@ public class ExpenseDetailResponseDto {
     @JsonProperty("expense_id")
     private final Long expenseId;
 
+    @JsonProperty("expense_name")
+    private final String expenseName;
+
     private final Integer amount;
     private final String category;
 
@@ -26,9 +29,10 @@ public class ExpenseDetailResponseDto {
 
 
     @Builder
-    private ExpenseDetailResponseDto(Long expenseId, Integer amount, String category, String expenseTag,
+    private ExpenseDetailResponseDto(Long expenseId, String expenseName, Integer amount, String category, String expenseTag,
                                      String memo, String paymentMethod, LocalDate expenseDate) {
         this.expenseId = expenseId;
+        this.expenseName = expenseName;
         this.amount = amount;
         this.category = category;
         this.expenseTag = expenseTag;
@@ -40,6 +44,7 @@ public class ExpenseDetailResponseDto {
     public static ExpenseDetailResponseDto from(Expense expense) {
         return ExpenseDetailResponseDto.builder()
                 .expenseId(expense.getId())
+                .expenseName(expense.getExpenseName())
                 .amount(expense.getAmount())
                 .category(expense.getCategory().getDescription())
                 .expenseTag(expense.getExpenseTag())

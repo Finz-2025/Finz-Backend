@@ -31,6 +31,7 @@ public class ExpenseService {
 
         Expense expense = Expense.builder()
                 .user(user)
+                .expenseName(requestDto.getExpense_name())
                 .amount(requestDto.getAmount())
                 .category(category)
                 .expenseTag(requestDto.getExpense_tag())
