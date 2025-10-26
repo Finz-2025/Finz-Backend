@@ -1,6 +1,7 @@
 package com.finz.controller;
 import com.finz.domain.GlobalResponseDto;
 import com.finz.domain.expense.dto.CreateExpenseResponseDto;
+import com.finz.domain.expense.dto.ExpenseDetailResponseDto;
 import com.finz.domain.expense.dto.ExpenseRequestDto;
 import com.finz.service.ExpenseService;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,24 @@ public class ExpenseController {
                 .status(200)
                 .success(true)
                 .message("지출이 입력되었습니다.")
+                .data(data)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    // 건당 상세내역 조회
+    @GetMapping("/{expenseId}")
+    public ResponseEntity<GlobalResponseDto<ExpenseDetailResponseDto>> getExpenseDetail(
+            @PathVariable Long expenseId
+    ) {
+        ExpenseDetailResponseDto data = expenseService.getExpenseDetail(expenseId);
+
+        // GlobalResponseDto로 래핑
+        GlobalResponseDto<ExpenseDetailResponseDto> response = GlobalResponseDto.<ExpenseDetailResponseDto>builder()
+                .status(200)
+                .success(true)
+                .message("지출 내역 상세 조회 성공")
                 .data(data)
                 .build();
 
