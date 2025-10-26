@@ -1,4 +1,4 @@
-package com.finz.domain.expense.dto;
+package com.finz.dto.expense;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.finz.domain.expense.Expense;
 import lombok.Builder;

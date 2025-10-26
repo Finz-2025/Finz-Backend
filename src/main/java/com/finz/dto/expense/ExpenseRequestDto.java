@@ -1,4 +1,4 @@
-package com.finz.domain.expense.dto;
+package com.finz.dto.expense;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;

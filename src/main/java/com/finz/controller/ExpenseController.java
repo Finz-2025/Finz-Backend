@@ -1,8 +1,8 @@
 package com.finz.controller;
-import com.finz.domain.GlobalResponseDto;
-import com.finz.domain.expense.dto.CreateExpenseResponseDto;
-import com.finz.domain.expense.dto.ExpenseDetailResponseDto;
-import com.finz.domain.expense.dto.ExpenseRequestDto;
+import com.finz.dto.GlobalResponseDto;
+import com.finz.dto.expense.CreateExpenseResponseDto;
+import com.finz.dto.expense.ExpenseDetailResponseDto;
+import com.finz.dto.expense.ExpenseRequestDto;
 import com.finz.service.ExpenseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

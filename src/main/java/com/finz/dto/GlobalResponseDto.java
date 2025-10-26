@@ -1,4 +1,4 @@
-package com.finz.domain;
+package com.finz.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Getter;
