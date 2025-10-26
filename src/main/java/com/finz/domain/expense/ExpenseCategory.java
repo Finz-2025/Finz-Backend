@@ -3,6 +3,8 @@ package com.finz.domain.expense;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+import java.util.Arrays;
+
 @Getter
 @RequiredArgsConstructor
 public enum ExpenseCategory {
@@ -15,4 +17,12 @@ public enum ExpenseCategory {
     ETC("기타");
 
     private final String description;
+
+    // Request의 카테고리 문자열을 Enum 상수로 변경
+    public static ExpenseCategory fromDescription(String description) {
+        return Arrays.stream(ExpenseCategory.values())
+                .filter(category -> category.getDescription().equals(description))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 카테고리입니다: " + description));
+    }
 }
