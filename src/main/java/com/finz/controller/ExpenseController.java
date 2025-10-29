@@ -35,6 +35,23 @@ public class ExpenseController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/{expenseId}")
+    public ResponseEntity<GlobalResponseDto<CreateExpenseResponseDto>> updateExpense(
+            @PathVariable Long expenseId,
+            @RequestBody ExpenseRequestDto requestDto // 입력 DTO 재사용
+    ) {
+        CreateExpenseResponseDto data = expenseService.updateExpense(expenseId, requestDto);
+
+        GlobalResponseDto<CreateExpenseResponseDto> response = GlobalResponseDto.<CreateExpenseResponseDto>builder()
+                .status(200)
+                .success(true)
+                .message("지출이 수정되었습니다.")
+                .data(data)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
     // 건당 상세내역 조회
     @GetMapping("/{expenseId}")
     public ResponseEntity<GlobalResponseDto<ExpenseDetailResponseDto>> getExpenseDetail(
