@@ -33,7 +33,20 @@ public class CoachService {
     private final GoalRepository goalRepository;
     private final ExpenseRepository expenseRepository;
     private final GeminiApiClient geminiClient;
-    
+
+    @Transactional(readOnly = true) // 데이터 변경이 없는 조회 작업
+    public List<CoachMessageDto> getChatHistory(Long userId) {
+        log.info("대화 내역 조회 - userId: {}", userId);
+
+        // 1. Repository를 통해 엔티티 조회 (시간 오름차순)
+        List<CoachMessage> messages = messageRepository.findByUserIdOrderByCreatedAtAsc(userId);
+
+        // 2. 엔티티 리스트를 DTO 리스트로 변환
+        return messages.stream()
+                .map(CoachMessageDto::fromEntity) // DTO의 팩토리 메서드 사용
+                .collect(Collectors.toList());
+    }
+
     // 빠른 제안: 목표 설정 대화 시작
     @Transactional
     public CoachResponseDto startGoalSettingConversation(Long userId) {
