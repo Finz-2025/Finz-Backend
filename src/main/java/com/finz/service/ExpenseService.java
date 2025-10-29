@@ -2,7 +2,7 @@ package com.finz.service;
 
 import com.finz.domain.expense.Expense;
 import com.finz.domain.expense.ExpenseCategory;
-import com.finz.domain.expense.ExpenseRepository;
+import com.finz.repository.ExpenseRepository;
 import com.finz.domain.expense.PaymentMethod;
 import com.finz.dto.expense.CreateExpenseResponseDto;
 import com.finz.dto.expense.ExpenseDetailResponseDto;
