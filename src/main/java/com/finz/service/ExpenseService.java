@@ -74,4 +74,12 @@ public class ExpenseService {
 
         return new CreateExpenseResponseDto(expense.getId());
     }
+
+    @Transactional
+    public void deleteExpense(Long expenseId) {
+        Expense expense = expenseRepository.findById(expenseId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 지출 내역을 찾을 수 없습니다. id=" + expenseId));
+
+        expenseRepository.delete(expense);
+    }
 }

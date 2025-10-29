@@ -52,6 +52,22 @@ public class ExpenseController {
         return ResponseEntity.ok(response);
     }
 
+    @DeleteMapping("/{expenseId}")
+    public ResponseEntity<GlobalResponseDto<Object>> deleteExpense(
+            @PathVariable Long expenseId
+    ) {
+        expenseService.deleteExpense(expenseId);
+
+        GlobalResponseDto<Object> response = GlobalResponseDto.builder()
+                .status(200)
+                .success(true)
+                .message("지출이 삭제되었습니다.")
+                .data(null) // data를 null로 설정
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
     // 건당 상세내역 조회
     @GetMapping("/{expenseId}")
     public ResponseEntity<GlobalResponseDto<ExpenseDetailResponseDto>> getExpenseDetail(
