@@ -35,7 +35,7 @@ public class CoachService {
     private final ExpenseRepository expenseRepository;
     private final GeminiApiClient geminiClient;
 
-    // 목표 상담 요청 (Controller용)
+    // 목표 상담 요청
     @Transactional
     public GlobalResponseDto<CoachResponseDto> requestGoalConsult(Long userId) {
         log.info("목표 상담 요청 - userId: {}", userId);
@@ -263,5 +263,142 @@ public class CoachService {
                 .content(msg.getContent())
                 .build())
             .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void processNewExpenseRecord(Long userId, Expense expense) {
+
+        log.info("[User: {}] 신규 지출 기록 처리 시작 - ExpenseId: {}", userId, expense.getId());
+
+        // 1. 지출 내역을 "USER" 메시지로 변환하여 DB 저장
+        String userContent = String.format(
+                "[지출 기록 📝] %s | %s | %,d원 (태그: #%s)",
+                expense.getCategory().getDescription(),
+                expense.getExpenseName(),
+                expense.getAmount(),
+                expense.getExpenseTag() != null ? expense.getExpenseTag() : "없음"
+        );
+
+        CoachMessage userMsg = CoachMessage.builder()
+                .userId(userId)
+                .sender(MessageSender.USER)
+                .messageType(MessageType.EXPENSE_RECORD)
+                .content(userContent)
+                .build();
+        messageRepository.save(userMsg);
+
+        // 2. AI 피드백 생성을 위한 컨텍스트(사용자) 수집
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        // --- (컨텍스트 수집 고도화) ---
+        // 3. "이번 달"의 시작일 계산
+        LocalDate startOfMonth = expense.getExpenseDate().withDayOfMonth(1);
+
+        // 4. "이번 달"의 총 지출액 및 남은 예산 계산
+        Integer totalSpentThisMonth = expenseRepository.findTotalAmountByUserIdAndDateAfter(userId, startOfMonth);
+        Integer remainingBudget = user.getMonthlyBudget() - totalSpentThisMonth;
+
+        // 5. (핵심) 태그 기반 심층 분석
+        String currentTag = expense.getExpenseTag();
+        TagExpenseSummary tagSummary = null; // 기본값 null
+
+        if (currentTag != null && !currentTag.isEmpty()) {
+            // 이번 달에 이 태그를 몇 번 썼는지, 총 얼마 썼는지 조회
+            tagSummary = expenseRepository.findTagSummaryByUserIdAndTagAfter(
+                    userId,
+                    currentTag,
+                    startOfMonth
+            );
+            log.info("[User: {}] 태그 '#{}' 분석: {}회 / {}원", userId, currentTag, tagSummary.getCount(), tagSummary.getTotalAmount());
+        }
+        // --- (고도화 끝) ---
+
+        // 6. 지출 피드백 전용 시스템 프롬프트 생성 (모든 정보 전달)
+        String systemPrompt = buildExpenseFeedbackPrompt(
+                user,
+                expense,
+                totalSpentThisMonth,
+                remainingBudget,
+                tagSummary // 5번에서 조회한 태그 정보 (null일 수 있음)
+        );
+
+        // 7. Gemini API 호출
+        String aiResponse = geminiClient.chat(
+                systemPrompt,
+                Collections.emptyList(),
+                userContent // (chat 메서드 형식을 맞추기 위해 전달)
+        );
+
+        // 8. AI 응답 DB 저장
+        CoachMessage aiMsg = CoachMessage.builder()
+                .userId(userId)
+                .sender(MessageSender.AI)
+                .messageType(MessageType.EXPENSE_RECORD)
+                .content(aiResponse)
+                .build();
+        messageRepository.save(aiMsg);
+
+        log.info("[User: {}] 지출 기록 피드백 생성 완료 - MessageId: {}", userId, aiMsg.getMessageId());
+    }
+
+
+    private String buildExpenseFeedbackPrompt(
+            User user,
+            Expense expense,
+            Integer totalSpentThisMonth,
+            Integer remainingBudget,
+            TagExpenseSummary tagSummary // <-- 파라미터 추가
+    ) {
+        StringBuilder prompt = new StringBuilder();
+
+        prompt.append("당신은 FiNZ의 긍정적이고 격려하는 AI 재무 코치입니다.\n");
+        prompt.append("사용자가 방금 앱에 지출 내역을 기록했으며, 당신은 이 지출에 대해 **즉각적이고 짧은 피드백**을 제공해야 합니다.\n\n");
+
+        prompt.append("## 1. 사용자 정보\n");
+        prompt.append(String.format("- 이름: %s\n", user.getNickname()));
+        prompt.append(String.format("- 월 목표 예산: %,d원\n\n", user.getMonthlyBudget()));
+
+        prompt.append("## 2. 방금 기록된 지출 (분석 대상)\n");
+        prompt.append(String.format("- 카테고리: %s\n", expense.getCategory().getDescription()));
+        prompt.append(String.format("- 금액: %,d원\n", expense.getAmount()));
+        prompt.append(String.format("- 내용: %s\n", expense.getExpenseName()));
+        if (expense.getExpenseTag() != null && !expense.getExpenseTag().isEmpty()) {
+            prompt.append(String.format("- 태그: #%s\n", expense.getExpenseTag()));
+        }
+        prompt.append("\n");
+
+        prompt.append("## 3. 현재 재무 상태 (중요 맥락)\n");
+        prompt.append(String.format("- 이번 달 총 지출액: %,d원\n", totalSpentThisMonth));
+        prompt.append(String.format("- 남은 예산: %,d원\n\n", remainingBudget));
+
+        // --- (핵심 수정) ---
+        prompt.append("## 4. 태그 심층 분석 (Contextual Insight)\n");
+        if (tagSummary != null) {
+            prompt.append(String.format("- 사용자는 '#%s' 태그를 이번 달에 %d회 사용했습니다.\n",
+                    expense.getExpenseTag(), tagSummary.getCount()));
+            prompt.append(String.format("- 이 태그로만 총 %,d원을 지출했습니다.\n\n",
+                    tagSummary.getTotalAmount()));
+        } else {
+            prompt.append("- 이 지출에는 태그가 없습니다.\n\n");
+        }
+        // --- (수정 끝) ---
+
+        prompt.append("## 5. 당신의 임무 (매우 중요)\n");
+        prompt.append("당신은 **두 부분**으로 구성된 **매우 짧은** 피드백을 생성해야 합니다.\n");
+        prompt.append("1. **(코멘트)**: '방금 기록된 지출(2번)'에 대해 1~2문장으로 긍정적/중립적 코멘트를 하세요.\n");
+        prompt.append("2. **(브리핑)**: '현재 재무 상태(3번)'와 **특히 '태그 분석(4번)'**을 결합하여 **남은 예산**과 **태그 사용 현황**을 간결하게 브리핑하세요.\n\n");
+
+        prompt.append("## 6. 말투 및 제약사항\n");
+        prompt.append("- **절대 비난 금지.** (나쁜 예: '또 돈을 쓰셨네요.')\n");
+        prompt.append("- 긍정적/격려하는 톤, 친근한 존댓말, 이모지 1~2개 사용.\n");
+        prompt.append("- **반드시 한두 문장으로 매우 짧게** 요약하세요.\n");
+        prompt.append(String.format("- UI 예시 (태그 O): '기분 전환 간식이군요! 🧁 이번 달 '#스트레스' 태그로 %s번째 지출이네요. 남은 예산은 %,d원입니다! 🔥'\n",
+                (tagSummary != null ? tagSummary.getCount() : 1), remainingBudget)); // 예시도 동적으로
+        prompt.append(String.format("- UI 예시 (태그 X): '기록 완료! 꼼꼼하시네요 👍. 남은 예산은 %,d원입니다!'\n\n", remainingBudget));
+
+        prompt.append("위 모든 정보를 바탕으로, 사용자의 방금 지출(2번)에 대한 '코멘트'와 '브리핑'을 포함한 피드백을 작성하세요:");
+
+        return prompt.toString();
     }
 }
