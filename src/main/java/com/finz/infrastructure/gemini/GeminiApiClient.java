@@ -26,8 +26,8 @@ public class GeminiApiClient {
     
     private final RestTemplate restTemplate;
     
-    // 초기 메시지 생성 (범용)
-    public String generateInitialMessage(String systemPrompt) {
+    // 목표 설정 대화 첫 메시지 생성
+    public String generateInitialGoalMessage(String systemPrompt) {
         
         List<GeminiRequest.Content> contents = new ArrayList<>();
         
@@ -41,17 +41,11 @@ public class GeminiApiClient {
         contents.add(GeminiRequest.Content.builder()
             .role("user")
             .parts(List.of(GeminiRequest.Part.builder()
-                .text("위 정보를 바탕으로 상담 대화를 시작하는 첫 메시지를 작성해주세요.")
+                .text("위 정보를 바탕으로 목표 설정 대화를 시작하는 첫 메시지를 작성해주세요.")
                 .build()))
             .build());
         
         return callGeminiApi(contents);
-    }
-    
-    // 목표 설정 대화 첫 메시지 생성 (하위 호환성을 위해 유지)
-    @Deprecated
-    public String generateInitialGoalMessage(String systemPrompt) {
-        return generateInitialMessage(systemPrompt);
     }
     
     // 대화 진행 (히스토리 포함)
@@ -82,7 +76,7 @@ public class GeminiApiClient {
         return callGeminiApi(contents);
     }
     
-    // Gemini API 호출 (재시도 로직 포함)
+    // Gemini API 호출
     private String callGeminiApi(List<GeminiRequest.Content> contents) {
         
         String url = apiUrl + "?key=" + apiKey;
@@ -96,59 +90,31 @@ public class GeminiApiClient {
         
         HttpEntity<GeminiRequest> entity = new HttpEntity<>(request, headers);
         
-        // 최대 3번 재시도
-        int maxRetries = 3;
-        int retryCount = 0;
-        
-        while (retryCount < maxRetries) {
-            try {
-                log.debug("Gemini API 호출 시도 {}/{} - URL: {}", retryCount + 1, maxRetries, url);
+        try {
+            log.debug("Gemini API 호출 - URL: {}", url);
+            
+            GeminiResponse response = restTemplate.postForObject(
+                url,
+                entity,
+                GeminiResponse.class
+            );
+            
+            if (response != null && !response.getCandidates().isEmpty()) {
+                String text = response.getCandidates().get(0)
+                    .getContent()
+                    .getParts()
+                    .get(0)
+                    .getText();
                 
-                GeminiResponse response = restTemplate.postForObject(
-                    url,
-                    entity,
-                    GeminiResponse.class
-                );
-                
-                if (response != null && !response.getCandidates().isEmpty()) {
-                    String text = response.getCandidates().get(0)
-                        .getContent()
-                        .getParts()
-                        .get(0)
-                        .getText();
-                    
-                    log.debug("Gemini API 응답 성공");
-                    return text;
-                }
-                
-                throw new RuntimeException("Gemini API 응답이 비어있습니다.");
-                
-            } catch (Exception e) {
-                retryCount++;
-                
-                // 503 에러인 경우
-                if (e.getMessage() != null && e.getMessage().contains("503")) {
-                    if (retryCount < maxRetries) {
-                        log.warn("Gemini API 과부하 (503) - {}초 후 재시도 {}/{}", 
-                                retryCount * 2, retryCount, maxRetries);
-                        try {
-                            Thread.sleep(retryCount * 2000L); // 2초, 4초, 6초
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                        }
-                        continue;
-                    } else {
-                        log.error("Gemini API 재시도 초과 - 최대 {}번 시도 완료", maxRetries);
-                        throw new RuntimeException("AI 서비스가 현재 사용량이 많습니다. 잠시 후 다시 시도해주세요.");
-                    }
-                }
-                
-                // 다른 에러는 즉시 throw
-                log.error("Gemini API 호출 실패", e);
-                throw new RuntimeException("AI 응답 생성 중 오류가 발생했습니다: " + e.getMessage());
+                log.debug("Gemini API 응답: {}", text);
+                return text;
             }
+            
+            throw new RuntimeException("Gemini API 응답이 비어있습니다.");
+            
+        } catch (Exception e) {
+            log.error("Gemini API 호출 실패", e);
+            throw new RuntimeException("AI 응답 생성 중 오류가 발생했습니다: " + e.getMessage());
         }
-        
-        throw new RuntimeException("AI 서비스가 현재 사용량이 많습니다. 잠시 후 다시 시도해주세요.");
     }
 }
