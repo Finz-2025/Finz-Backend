@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.finz.dto.coach.CoachMessageDto;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -40,5 +42,15 @@ public class CoachController {
         
         CoachResponseDto response = coachService.generateResponse(DEFAULT_USER_ID, request);
         return ResponseEntity.ok(response);
+    }
+
+    // 그간의 대화 내역 조회
+    @GetMapping("/history")
+    @Operation(summary = "대화 내역 조회", description = "AI 코치와의 전체 대화 내역을 조회합니다.")
+    public ResponseEntity<List<CoachMessageDto>> getChatHistory() {
+        log.info("대화 내역 조회 요청 - userId: {}", DEFAULT_USER_ID);
+
+        List<CoachMessageDto> history = coachService.getChatHistory(DEFAULT_USER_ID);
+        return ResponseEntity.ok(history);
     }
 }
