@@ -33,7 +33,7 @@ public class ExpenseService {
 
         Expense expense = Expense.builder()
                 .user(user)
-                .expenseName(requestDto.getExpense_name())
+                .expenseName(requestDto.getExpense_name()) // (참고: title -> expenseName으로 사용 중이시네요)
                 .amount(requestDto.getAmount())
                 .category(category)
                 .expenseTag(requestDto.getExpense_tag())
@@ -44,12 +44,17 @@ public class ExpenseService {
 
         Expense savedExpense = expenseRepository.save(expense);
 
-        CoachResponseDto aiFeedback = coachService.processNewExpenseRecord(
+        // --- (수정된 부분) ---
+        // AI 피드백 생성을 '호출'만 하고, 반환값을 받지 않습니다.
+        // (CoachService의 해당 메서드 반환 타입이 void로 변경되어야 함)
+        coachService.processNewExpenseRecord(
                 user.getId(),
                 savedExpense
         );
 
-        return new CreateExpenseResponseDto(savedExpense.getId(), aiFeedback);
+        // AI 피드백 없이, expenseId만으로 응답 DTO를 생성하여 반환합니다.
+        return new CreateExpenseResponseDto(savedExpense.getId());
+        // --- (수정 끝) ---
     }
 
     // 지출 내역 아이디로 지출 내역 조회하기
@@ -79,6 +84,7 @@ public class ExpenseService {
                 requestDto.getExpense_date()
         );
 
+        // 이 부분은 이미 aiFeedback 없이 expenseId만 반환하고 있었네요.
         return new CreateExpenseResponseDto(expense.getId());
     }
 

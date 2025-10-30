@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CoachService {
-    
+
     private final CoachMessageRepository messageRepository;
     private final UserRepository userRepository;
     private final GoalRepository goalRepository;
@@ -51,31 +51,31 @@ public class CoachService {
     // 빠른 제안: 목표 설정 대화 시작
     @Transactional
     public CoachResponseDto startGoalSettingConversation(Long userId) {
-        
+
         log.info("목표 설정 대화 시작 - userId: {}", userId);
-        
+
         // 1. 사용자 정보 조회
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-        
+
         // 2. 기존 목표 조회
         List<Goal> existingGoals = goalRepository.findByUserIdAndStatus(
             userId, GoalStatus.ACTIVE
         );
-        
+
         // 3. 최근 1개월 지출 패턴 분석
         LocalDate oneMonthAgo = LocalDate.now().minusMonths(1);
         List<ExpensePattern> expenses = expenseRepository
             .findRecentPatternsByUserId(userId, oneMonthAgo);
-        
+
         // 4. 개인화된 시스템 프롬프트 생성
         String systemPrompt = buildGoalSettingPrompt(user, existingGoals, expenses);
-        
+
         log.debug("System Prompt: {}", systemPrompt);
-        
+
         // 5. Gemini API 호출
         String initialMessage = geminiClient.generateInitialGoalMessage(systemPrompt);
-        
+
         // 6. AI 첫 메시지 저장
         CoachMessage aiMessage = CoachMessage.builder()
             .userId(userId)
@@ -83,23 +83,23 @@ public class CoachService {
             .messageType(MessageType.GOAL_SETTING)
             .content(initialMessage)
             .build();
-        
+
         messageRepository.save(aiMessage);
-        
+
         log.info("목표 설정 대화 시작 완료 - messageId: {}", aiMessage.getMessageId());
-        
+
         return CoachResponseDto.builder()
             .message(initialMessage)
             .messageType(MessageType.GOAL_SETTING)
             .build();
     }
-    
+
     // 일반 메시지 응답 생성
     @Transactional
     public CoachResponseDto generateResponse(Long userId, MessageRequest request) {
-        
+
         log.info("메시지 응답 생성 - userId: {}, type: {}", userId, request.getMessageType());
-        
+
         // 1. 사용자 메시지 저장
         CoachMessage userMsg = CoachMessage.builder()
             .userId(userId)
@@ -107,33 +107,33 @@ public class CoachService {
             .messageType(request.getMessageType())
             .content(request.getMessage())
             .build();
-        
+
         messageRepository.save(userMsg);
-        
+
         // 2. 컨텍스트 수집
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-        
+
         List<Goal> goals = goalRepository.findByUserIdAndStatus(userId, GoalStatus.ACTIVE);
-        
+
         LocalDate oneMonthAgo = LocalDate.now().minusMonths(1);
         List<ExpensePattern> expenses = expenseRepository
             .findRecentPatternsByUserId(userId, oneMonthAgo);
-        
+
         // 3. 대화 히스토리 조회
         List<CoachMessage> history = messageRepository
             .findTop20ByUserIdOrderByCreatedAtDesc(userId);
         Collections.reverse(history);
-        
+
         // 4. 시스템 프롬프트 생성
         String systemPrompt = request.getMessageType() == MessageType.GOAL_SETTING
             ? buildGoalSettingPrompt(user, goals, expenses)
             : buildGeneralChatPrompt(user, goals, expenses);
-        
+
         // 5. Gemini API 호출
         List<GeminiMessage> geminiHistory = convertToGeminiFormat(history);
         String aiResponse = geminiClient.chat(systemPrompt, geminiHistory, request.getMessage());
-        
+
         // 6. AI 응답 저장
         CoachMessage aiMsg = CoachMessage.builder()
             .userId(userId)
@@ -141,42 +141,42 @@ public class CoachService {
             .messageType(request.getMessageType())
             .content(aiResponse)
             .build();
-        
+
         messageRepository.save(aiMsg);
-        
+
         // 7. 목표 제안 추출
         GoalSuggestion suggestion = null;
         if (request.getMessageType() == MessageType.GOAL_SETTING) {
             suggestion = extractGoalFromResponse(aiResponse);
         }
-        
+
         return CoachResponseDto.builder()
             .message(aiResponse)
             .messageType(request.getMessageType())
             .suggestedGoal(suggestion)
             .build();
     }
-    
+
     // 개인화된 목표 설정 시스템 프롬프트 생성
     private String buildGoalSettingPrompt(User user, List<Goal> goals, List<ExpensePattern> expenses) {
         StringBuilder prompt = new StringBuilder();
-        
+
         prompt.append("당신은 FiNZ의 친근한 AI 재무 코치입니다.\n");
         prompt.append("사용자가 '목표 설정' 버튼을 눌러서 대화를 시작했습니다.\n\n");
-        
+
         // 사용자 개인 정보 포함
         prompt.append("## 사용자 정보\n");
         prompt.append(String.format("- 이름: %s\n", user.getNickname()));
         prompt.append(String.format("- 연령대: %s\n", user.getAgeGroup().getDescription()));
         prompt.append(String.format("- 직업: %s\n", user.getJob().getDescription()));
         prompt.append(String.format("- 월 목표 예산: %,d원\n\n", user.getMonthlyBudget()));
-        
+
         // 기존 목표 정보
         if (!goals.isEmpty()) {
             prompt.append("## 현재 진행 중인 목표\n");
             for (Goal goal : goals) {
                 int progress = (int) ((goal.getCurrentAmount() * 100.0) / goal.getTargetAmount());
-                prompt.append(String.format("- %s: %,d원 목표 (현재 %d%% 달성)\n", 
+                prompt.append(String.format("- %s: %,d원 목표 (현재 %d%% 달성)\n",
                     goal.getGoalType(), goal.getTargetAmount(), progress));
             }
             prompt.append("\n");
@@ -184,21 +184,21 @@ public class CoachService {
             prompt.append("## 현재 진행 중인 목표\n");
             prompt.append("- 아직 설정된 목표가 없습니다.\n\n");
         }
-        
+
         // 지출 패턴 분석
         if (!expenses.isEmpty()) {
             prompt.append("## 최근 1개월 지출 패턴 (상위 5개)\n");
             int limit = Math.min(5, expenses.size());
             for (int i = 0; i < limit; i++) {
                 ExpensePattern expense = expenses.get(i);
-                prompt.append(String.format("- %s: %,d원 (%d회 사용)\n", 
-                    expense.getCategory().getDescription(), 
-                    expense.getTotalAmount(), 
+                prompt.append(String.format("- %s: %,d원 (%d회 사용)\n",
+                    expense.getCategory().getDescription(),
+                    expense.getTotalAmount(),
                     expense.getCount()));
             }
             prompt.append("\n");
         }
-        
+
         // AI의 역할 및 톤
         prompt.append("## 당신의 역할과 말투\n");
         prompt.append("1. 친근하고 격려하는 존댓말 사용\n");
@@ -206,7 +206,7 @@ public class CoachService {
         prompt.append("3. 사용자의 연령대와 직업을 고려한 맞춤형 조언\n");
         prompt.append("4. 지출 패턴을 분석해 구체적인 목표 제안\n");
         prompt.append("5. 목표는 현실적이고 달성 가능한 수준으로\n\n");
-        
+
         // 대화 진행 가이드
         prompt.append("## 대화 진행 방법\n");
         prompt.append("1. 먼저 친근하게 인사하며 목표 설정 시작\n");
@@ -215,38 +215,38 @@ public class CoachService {
         prompt.append("4. 구체적인 금액과 기간 질문\n");
         prompt.append("5. 실행 가능한 방법 함께 고민\n");
         prompt.append("6. 최종적으로 명확한 목표 제안\n\n");
-        
+
         // 개인화된 첫 메시지 예시
         prompt.append("## 첫 메시지 작성 가이드\n");
         prompt.append(String.format("- %s님의 이름을 부르며 친근하게 시작하세요\n", user.getNickname()));
-        
+
         if (!expenses.isEmpty()) {
             ExpensePattern topExpense = expenses.get(0);
-            prompt.append(String.format("- 최근 '%s' 지출이 %,d원으로 가장 많다는 점을 자연스럽게 언급하세요\n", 
+            prompt.append(String.format("- 최근 '%s' 지출이 %,d원으로 가장 많다는 점을 자연스럽게 언급하세요\n",
                 topExpense.getCategory().getDescription(), topExpense.getTotalAmount()));
         }
-        
+
         return prompt.toString();
     }
-    
+
     // 일반 대화용 시스템 프롬프트
     private String buildGeneralChatPrompt(User user, List<Goal> goals, List<ExpensePattern> expenses) {
         StringBuilder prompt = new StringBuilder();
-        
+
         prompt.append("당신은 FiNZ의 친근한 AI 재무 코치입니다.\n\n");
-        
+
         prompt.append("## 사용자 정보\n");
         prompt.append(String.format("- 이름: %s\n", user.getNickname()));
         prompt.append(String.format("- 연령대: %s\n", user.getAgeGroup().getDescription()));
         prompt.append(String.format("- 직업: %s\n\n", user.getJob().getDescription()));
-        
+
         prompt.append("## 역할\n");
         prompt.append("친근하고 격려하는 톤으로 사용자의 재무 관련 질문에 답변하세요.\n");
         prompt.append("이모지를 적절히 사용하고, 구체적이고 실행 가능한 조언을 제공하세요.\n");
-        
+
         return prompt.toString();
     }
-    
+
     // DB 메시지를 Gemini API 형식으로 변환
     private List<GeminiMessage> convertToGeminiFormat(List<CoachMessage> messages) {
         return messages.stream()
@@ -256,27 +256,27 @@ public class CoachService {
                 .build())
             .collect(Collectors.toList());
     }
-    
+
     // AI 응답에서 목표 정보 추출
     private GoalSuggestion extractGoalFromResponse(String response) {
         Pattern amountPattern = Pattern.compile("(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*(?:만\\s*)?원");
         Matcher matcher = amountPattern.matcher(response);
-        
+
         if (matcher.find()) {
             String amountStr = matcher.group(1).replace(",", "");
             int amount = Integer.parseInt(amountStr);
-            
+
             if (response.contains("만원") || response.contains("만 원")) {
                 amount *= 10000;
             }
-            
+
             String goalType = "저축";
             if (response.contains("줄이") || response.contains("절약")) {
                 goalType = "지출 줄이기";
             } else if (response.contains("투자")) {
                 goalType = "투자";
             }
-            
+
             return GoalSuggestion.builder()
                 .goalType(goalType)
                 .targetAmount(amount)
@@ -288,42 +288,36 @@ public class CoachService {
     }
 
     @Transactional
-    public CoachResponseDto processNewExpenseRecord(Long userId, Expense expense) {
-
+    public void processNewExpenseRecord(Long userId, Expense expense) {
         log.info("[User: {}] 신규 지출 기록 처리 시작 - ExpenseId: {}", userId, expense.getId());
 
-        // 1. 지출 내역을 "USER" 메시지로 변환하여 DB 저장
+        // 지출 내역을 "USER" 메시지로 변환하여 DB 저장
         String userContent = String.format(
                 "[지출 기록 📝] %s | %s | %,d원",
-                expense.getCategory().getDescription(), // "식비"
-                expense.getExpenseName(),             // "스타벅스"
-                expense.getAmount()                   // 5,000
+                expense.getCategory().getDescription(),
+                expense.getExpenseName(),
+                expense.getAmount()
         );
 
         CoachMessage userMsg = CoachMessage.builder()
                 .userId(userId)
                 .sender(MessageSender.USER)
-                .messageType(MessageType.EXPENSE_RECORD) // 새로운 타입 지정
+                .messageType(MessageType.EXPENSE_RECORD) // (MessageType에 EXPENSE_RECORD가 있어야 함)
                 .content(userContent)
                 .build();
         messageRepository.save(userMsg);
 
-        // 2. AI 피드백 생성을 위한 컨텍스트(사용자) 수집
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-        // 3. 지출 피드백 전용 시스템 프롬프트 생성
         String systemPrompt = buildExpenseFeedbackPrompt(user, expense);
 
-        // 4. Gemini API 호출
-        // (즉각적인 피드백은 이전 대화 내역이 필요 없으므로 빈 리스트 전달)
         String aiResponse = geminiClient.chat(
                 systemPrompt,
                 Collections.emptyList(),
-                userContent // 프롬프트에 이미 지출 내역이 있지만, chat 메서드 형식을 맞추기 위해 전달
+                userContent
         );
 
-        // 5. AI 응답 DB 저장
         CoachMessage aiMsg = CoachMessage.builder()
                 .userId(userId)
                 .sender(MessageSender.AI)
@@ -333,13 +327,8 @@ public class CoachService {
         messageRepository.save(aiMsg);
 
         log.info("[User: {}] 지출 기록 피드백 생성 완료 - MessageId: {}", userId, aiMsg.getMessageId());
-
-        // 6. 생성된 AI 응답을 DTO로 빌드하여 ExpenseService로 반환
-        return CoachResponseDto.builder()
-                .message(aiResponse)
-                .messageType(MessageType.EXPENSE_RECORD)
-                .build();
     }
+
 
     private String buildExpenseFeedbackPrompt(User user, Expense expense) {
         StringBuilder prompt = new StringBuilder();
