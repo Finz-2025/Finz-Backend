@@ -13,5 +13,4 @@ import lombok.NoArgsConstructor;
 public class CoachResponseDto {
     private String message;
     private MessageType messageType;
-    private GoalSuggestion suggestedGoal;  // nullable
 }
