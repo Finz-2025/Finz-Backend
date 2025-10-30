@@ -1,6 +1,9 @@
 package com.finz.controller;
 
+import com.finz.dto.GlobalResponseDto;
 import com.finz.dto.coach.CoachResponseDto;
+import com.finz.dto.coach.ExpenseConsultRequest;
+import com.finz.dto.coach.GoalConsultRequest;
 import com.finz.dto.coach.MessageRequest;
 import com.finz.service.CoachService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,31 +17,44 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/coach")
 @RequiredArgsConstructor
-@Tag(name = "Coach", description = "AI 코치 대화 API")
+@Tag(name = "Coach", description = "AI 코치 상담 API")
 public class CoachController {
     
     private final CoachService coachService;
     
-    // 1인 사용자용 고정 ID
-    private static final Long DEFAULT_USER_ID = 1L;
-    
-    // 빠른 제안: 목표 설정 대화 시작
-    @PostMapping("/start-goal-setting")
-    @Operation(summary = "목표 설정 대화 시작", description = "AI 코치가 사용자의 정보를 바탕으로 목표 설정 대화를 시작합니다.")
-    public ResponseEntity<CoachResponseDto> startGoalSetting() {
-        log.info("목표 설정 시작 요청");
+    // 목표 상담 요청
+    @PostMapping("/goal-consult")
+    @Operation(summary = "목표 상담 요청", description = "특정 목표에 대한 AI 코치 상담을 시작합니다.")
+    public ResponseEntity<GlobalResponseDto<CoachResponseDto>> startGoalConsult(
+            @RequestBody GoalConsultRequest request) {
+        log.info("목표 상담 요청 - userId: {}, goalId: {}", request.getUserId(), request.getGoalId());
         
-        CoachResponseDto response = coachService.startGoalSettingConversation(DEFAULT_USER_ID);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(
+            coachService.requestGoalConsult(request.getUserId(), request.getGoalId())
+        );
+    }
+    
+    // 지출 상담 요청
+    @PostMapping("/expense-consult")
+    @Operation(summary = "지출 상담 요청", description = "사용자의 지출 패턴에 대한 AI 코치 상담을 시작합니다.")
+    public ResponseEntity<GlobalResponseDto<CoachResponseDto>> startExpenseConsult(
+            @RequestBody ExpenseConsultRequest request) {
+        log.info("지출 상담 요청 - userId: {}", request.getUserId());
+        
+        return ResponseEntity.ok(
+            coachService.requestExpenseConsult(request.getUserId())
+        );
     }
     
     // 메시지 전송 (대화 진행)
     @PostMapping("/message")
     @Operation(summary = "메시지 전송", description = "사용자 메시지를 전송하고 AI 코치의 응답을 받습니다.")
-    public ResponseEntity<CoachResponseDto> sendMessage(@RequestBody MessageRequest request) {
-        log.info("메시지 전송 - type: {}", request.getMessageType());
+    public ResponseEntity<GlobalResponseDto<CoachResponseDto>> sendMessage(
+            @RequestBody MessageRequest request) {
+        log.info("메시지 전송 - userId: {}, type: {}", request.getUserId(), request.getMessageType());
         
-        CoachResponseDto response = coachService.generateResponse(DEFAULT_USER_ID, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(
+            coachService.sendMessage(request.getUserId(), request)
+        );
     }
 }
