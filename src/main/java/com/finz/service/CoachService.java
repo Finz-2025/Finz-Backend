@@ -49,6 +49,21 @@ public class CoachService {
                 .data(data)
                 .build();
     }
+    
+    // 지출 상담 요청
+    @Transactional
+    public GlobalResponseDto<CoachResponseDto> requestExpenseConsult(Long userId) {
+        log.info("지출 상담 요청 - userId: {}", userId);
+        
+        CoachResponseDto data = startExpenseConsultConversation(userId);
+
+        return GlobalResponseDto.<CoachResponseDto>builder()
+                .status(200)
+                .success(true)
+                .message("지출 상담이 시작되었습니다.")
+                .data(data)
+                .build();
+    }
 
     @Transactional(readOnly = true) // 데이터 변경이 없는 조회 작업
     public List<CoachMessageDto> getChatHistory(Long userId) {
@@ -89,7 +104,7 @@ public class CoachService {
         log.debug("System Prompt: {}", systemPrompt);
 
         // 5. Gemini API 호출
-        String initialMessage = geminiClient.generateInitialGoalMessage(systemPrompt);
+        String initialMessage = geminiClient.generateInitialMessage(systemPrompt);
 
         // 6. AI 첫 메시지 저장
         CoachMessage aiMessage = CoachMessage.builder()
@@ -106,6 +121,50 @@ public class CoachService {
         return CoachResponseDto.builder()
             .message(initialMessage)
             .messageType(MessageType.GOAL_SETTING)
+            .build();
+    }
+    
+    // 지출 상담 대화 시작
+    @Transactional
+    public CoachResponseDto startExpenseConsultConversation(Long userId) {
+        
+        log.info("지출 상담 대화 시작 - userId: {}", userId);
+        
+        // 1. 사용자 정보 조회
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+        
+        // 2. 최근 1개월 지출 패턴 분석
+        LocalDate oneMonthAgo = LocalDate.now().minusMonths(1);
+        List<ExpensePattern> expenses = expenseRepository
+            .findRecentPatternsByUserId(userId, oneMonthAgo);
+        
+        // 3. 현재 목표 조회 (선택)
+        List<Goal> activeGoals = goalRepository.findByUserIdAndStatus(userId, GoalStatus.ACTIVE);
+        
+        // 4. 개인화된 지출 상담 프롬프트 생성
+        String systemPrompt = buildExpenseConsultPrompt(user, expenses, activeGoals);
+        
+        log.debug("Expense Consult Prompt: {}", systemPrompt);
+        
+        // 5. Gemini API 호출
+        String initialMessage = geminiClient.generateInitialMessage(systemPrompt);
+        
+        // 6. AI 첫 메시지 저장
+        CoachMessage aiMessage = CoachMessage.builder()
+            .userId(userId)
+            .sender(MessageSender.AI)
+            .messageType(MessageType.EXPENSE_CONSULT)
+            .content(initialMessage)
+            .build();
+        
+        messageRepository.save(aiMessage);
+        
+        log.info("지출 상담 대화 시작 완료 - messageId: {}", aiMessage.getMessageId());
+        
+        return CoachResponseDto.builder()
+            .message(initialMessage)
+            .messageType(MessageType.EXPENSE_CONSULT)
             .build();
     }
 
@@ -141,9 +200,14 @@ public class CoachService {
         Collections.reverse(history);
 
         // 4. 시스템 프롬프트 생성
-        String systemPrompt = request.getMessageType() == MessageType.GOAL_SETTING
-            ? buildGoalSettingPrompt(user, goals, expenses)
-            : buildGeneralChatPrompt(user, goals, expenses);
+        String systemPrompt;
+        if (request.getMessageType() == MessageType.GOAL_SETTING) {
+            systemPrompt = buildGoalSettingPrompt(user, goals, expenses);
+        } else if (request.getMessageType() == MessageType.EXPENSE_CONSULT) {
+            systemPrompt = buildExpenseConsultPrompt(user, expenses, goals);
+        } else {
+            systemPrompt = buildGeneralChatPrompt(user, goals, expenses);
+        }
 
         // 5. Gemini API 호출
         List<GeminiMessage> geminiHistory = convertToGeminiFormat(history);
@@ -234,6 +298,101 @@ public class CoachService {
                 topExpense.getCategory().getDescription(), topExpense.getTotalAmount()));
         }
 
+        return prompt.toString();
+    }
+    
+    // 지출 상담 전용 시스템 프롬프트 생성
+    private String buildExpenseConsultPrompt(User user, List<ExpensePattern> expenses, List<Goal> goals) {
+        StringBuilder prompt = new StringBuilder();
+        
+        prompt.append("당신은 Finz의 친근한 AI 재무 코치입니다.\n");
+        prompt.append("사용자가 '지출 상담' 버튼을 눌러서 대화를 시작했습니다.\n\n");
+        
+        // 사용자 개인 정보
+        prompt.append("## 사용자 정보\n");
+        prompt.append(String.format("- 이름: %s\n", user.getNickname()));
+        prompt.append(String.format("- 연령대: %s\n", user.getAgeGroup().getDescription()));
+        prompt.append(String.format("- 직업: %s\n", user.getJob().getDescription()));
+        prompt.append(String.format("- 월 목표 예산: %,d원\n\n", user.getMonthlyBudget()));
+        
+        // 지출 패턴 분석 (핵심!)
+        if (!expenses.isEmpty()) {
+            prompt.append("## 최근 1개월 지출 패턴 (중요!)\n");
+            
+            // 총 지출액 계산
+            long totalExpense = expenses.stream()
+                .mapToLong(ExpensePattern::getTotalAmount)
+                .sum();
+            
+            prompt.append(String.format("- 총 지출액: %,d원\n", totalExpense));
+            prompt.append(String.format("- 예산 대비: %d%%\n\n", (totalExpense * 100 / user.getMonthlyBudget())));
+            
+            // 카테고리별 상위 5개
+            prompt.append("### 카테고리별 지출 (상위 5개)\n");
+            int limit = Math.min(5, expenses.size());
+            for (int i = 0; i < limit; i++) {
+                ExpensePattern expense = expenses.get(i);
+                long percentage = (expense.getTotalAmount() * 100) / totalExpense;
+                prompt.append(String.format("%d. %s: %,d원 (%d%%, %d회)\n",
+                    i + 1,
+                    expense.getCategory().getDescription(),
+                    expense.getTotalAmount(),
+                    percentage,
+                    expense.getCount()));
+            }
+            prompt.append("\n");
+        } else {
+            prompt.append("## 최근 1개월 지출 패턴\n");
+            prompt.append("- 아직 지출 내역이 없습니다.\n\n");
+        }
+        
+        // 활성 목표 (있다면)
+        if (!goals.isEmpty()) {
+            prompt.append("## 현재 진행 중인 목표\n");
+            for (Goal goal : goals) {
+                int progress = (int) ((goal.getCurrentAmount() * 100.0) / goal.getTargetAmount());
+                prompt.append(String.format("- %s: %,d원 목표 (현재 %d%% 달성)\n",
+                    goal.getGoalType(), goal.getTargetAmount(), progress));
+            }
+            prompt.append("\n");
+        }
+        
+        // AI의 역할
+        prompt.append("## 당신의 역할과 말투\n");
+        prompt.append("1. 친근하고 격려하는 존댓말 사용\n");
+        prompt.append("2. 이모지를 적절히 활용 (💰, 📊, 💡, 🎯, 👍 등)\n");
+        prompt.append("3. 지출 패턴을 분석해 구체적인 절약 방법 제안\n");
+        prompt.append("4. 비난하지 말고, 개선점을 긍정적으로 제시\n");
+        prompt.append("5. 실천 가능한 작은 변화 제안\n\n");
+        
+        // 대화 진행 가이드
+        prompt.append("## 대화 진행 방법\n");
+        prompt.append("1. 친근하게 인사하며 지출 패턴 언급\n");
+        prompt.append("2. 가장 많이 지출한 카테고리 지적\n");
+        prompt.append("3. 예산 대비 사용률 피드백\n");
+        prompt.append("4. 구체적인 절약 방법 제안\n");
+        prompt.append("5. 사용자의 의견 물어보기\n\n");
+        
+        // 첫 메시지 작성 가이드
+        prompt.append("## 첫 메시지 작성 가이드\n");
+        prompt.append(String.format("- %s님의 이름을 부르며 시작하세요\n", user.getNickname()));
+        
+        if (!expenses.isEmpty()) {
+            ExpensePattern topExpense = expenses.get(0);
+            prompt.append(String.format("- 최근 '%s'에 가장 많이 지출했다는 점을 자연스럽게 언급하세요\n",
+                topExpense.getCategory().getDescription()));
+            
+            // 예산 초과 여부
+            long totalExpense = expenses.stream()
+                .mapToLong(ExpensePattern::getTotalAmount)
+                .sum();
+            if (totalExpense > user.getMonthlyBudget()) {
+                prompt.append("- 예산을 초과했다는 점을 부드럽게 지적하고 절약 방법을 제안하세요\n");
+            } else {
+                prompt.append("- 예산 안에서 잘 관리하고 있다고 칭찬하되, 더 절약할 수 있는 팁을 제공하세요\n");
+            }
+        }
+        
         return prompt.toString();
     }
 
