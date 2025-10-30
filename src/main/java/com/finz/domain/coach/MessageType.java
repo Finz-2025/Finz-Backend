@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum MessageType {
     GOAL_SETTING("목표 설정"),
-    EXPENSE_ADVICE("지출 조언"),
+    EXPENSE_CONSULT("지출 상담"),
     FREE_CHAT("자유 대화"),
     EXPENSE_RECORD("지출 기록");
 
