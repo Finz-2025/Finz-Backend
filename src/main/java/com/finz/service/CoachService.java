@@ -9,6 +9,7 @@ import com.finz.domain.goal.GoalStatus;
 import com.finz.domain.user.User;
 import com.finz.domain.user.UserRepository;
 import com.finz.dto.coach.*;
+import com.finz.dto.GlobalResponseDto;
 import com.finz.infrastructure.gemini.GeminiApiClient;
 import com.finz.infrastructure.gemini.dto.GeminiMessage;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -33,6 +32,21 @@ public class CoachService {
     private final GoalRepository goalRepository;
     private final ExpenseRepository expenseRepository;
     private final GeminiApiClient geminiClient;
+
+    // 목표 상담 요청 (Controller용)
+    @Transactional
+    public GlobalResponseDto<CoachResponseDto> requestGoalConsult(Long userId) {
+        log.info("목표 상담 요청 - userId: {}", userId);
+        
+        CoachResponseDto data = startGoalSettingConversation(userId);
+
+        return GlobalResponseDto.<CoachResponseDto>builder()
+                .status(200)
+                .success(true)
+                .message("목표 상담이 시작되었습니다.")
+                .data(data)
+                .build();
+    }
 
     @Transactional(readOnly = true) // 데이터 변경이 없는 조회 작업
     public List<CoachMessageDto> getChatHistory(Long userId) {
@@ -143,16 +157,9 @@ public class CoachService {
         
         messageRepository.save(aiMsg);
         
-        // 7. 목표 제안 추출
-        GoalSuggestion suggestion = null;
-        if (request.getMessageType() == MessageType.GOAL_SETTING) {
-            suggestion = extractGoalFromResponse(aiResponse);
-        }
-        
         return CoachResponseDto.builder()
             .message(aiResponse)
             .messageType(request.getMessageType())
-            .suggestedGoal(suggestion)
             .build();
     }
     
@@ -160,7 +167,7 @@ public class CoachService {
     private String buildGoalSettingPrompt(User user, List<Goal> goals, List<ExpensePattern> expenses) {
         StringBuilder prompt = new StringBuilder();
         
-        prompt.append("당신은 FiNZ의 친근한 AI 재무 코치입니다.\n");
+        prompt.append("당신은 Finz의 친근한 AI 재무 코치입니다.\n");
         prompt.append("사용자가 '목표 설정' 버튼을 눌러서 대화를 시작했습니다.\n\n");
         
         // 사용자 개인 정보 포함
@@ -232,7 +239,7 @@ public class CoachService {
     private String buildGeneralChatPrompt(User user, List<Goal> goals, List<ExpensePattern> expenses) {
         StringBuilder prompt = new StringBuilder();
         
-        prompt.append("당신은 FiNZ의 친근한 AI 재무 코치입니다.\n\n");
+        prompt.append("당신은 Finz의 친근한 AI 재무 코치입니다.\n\n");
         
         prompt.append("## 사용자 정보\n");
         prompt.append(String.format("- 이름: %s\n", user.getNickname()));
@@ -254,35 +261,5 @@ public class CoachService {
                 .content(msg.getContent())
                 .build())
             .collect(Collectors.toList());
-    }
-    
-    // AI 응답에서 목표 정보 추출
-    private GoalSuggestion extractGoalFromResponse(String response) {
-        Pattern amountPattern = Pattern.compile("(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*(?:만\\s*)?원");
-        Matcher matcher = amountPattern.matcher(response);
-        
-        if (matcher.find()) {
-            String amountStr = matcher.group(1).replace(",", "");
-            int amount = Integer.parseInt(amountStr);
-            
-            if (response.contains("만원") || response.contains("만 원")) {
-                amount *= 10000;
-            }
-            
-            String goalType = "저축";
-            if (response.contains("줄이") || response.contains("절약")) {
-                goalType = "지출 줄이기";
-            } else if (response.contains("투자")) {
-                goalType = "투자";
-            }
-            
-            return GoalSuggestion.builder()
-                .goalType(goalType)
-                .targetAmount(amount)
-                .durationMonths(1)
-                .build();
-        }
-        
-        return null;
     }
 }
