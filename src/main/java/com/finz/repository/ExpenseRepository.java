@@ -1,8 +1,11 @@
 package com.finz.repository;
 
 import com.finz.domain.expense.Expense;
+import com.finz.domain.expense.ExpenseCategory;
 import com.finz.domain.expense.ExpensePattern;
 import com.finz.domain.expense.TagExpenseSummary;
+import com.finz.domain.user.User;
+import com.finz.dto.home.DailyExpenseTotalDto;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -40,4 +43,43 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             @Param("tag") String tag,
             @Param("startDate") LocalDate startDate
     );
+
+    // 카테고리별 총액
+    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.user.id = :userId " +
+            "AND e.category = :category AND e.expenseDate BETWEEN :startDate AND :endDate")
+    Integer findTotalAmountByCategoryAndDateRange(
+            @Param("userId") Long userId,
+            @Param("category") ExpenseCategory category,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+
+    // 특정 기간 태그별 횟수
+    @Query("SELECT COUNT(e) FROM Expense e WHERE e.user.id = :userId " +
+            "AND e.expenseTag = :tag AND e.expenseDate BETWEEN :startDate AND :endDate")
+    Integer findCountByTagAndDateRange(
+            @Param("userId") Long userId,
+            @Param("tag") String tag,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.user.id = :userId AND e.expenseDate = :date")
+    Integer findTotalAmountByUserIdAndDate(
+            @Param("userId") Long userId,
+            @Param("date") LocalDate date
+    );
+
+    @Query("SELECT e.expenseDate as date, SUM(e.amount) as totalAmount " +
+            "FROM Expense e " +
+            "WHERE e.user.id = :userId AND e.expenseDate BETWEEN :startDate AND :endDate " +
+            "GROUP BY e.expenseDate")
+    List<DailyExpenseTotalDto> findDailyTotalsByMonth(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    List<Expense> findByUserAndExpenseDate(User user, LocalDate date);
 }
