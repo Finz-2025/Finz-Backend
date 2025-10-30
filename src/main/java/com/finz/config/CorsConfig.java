@@ -10,7 +10,11 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOriginPatterns("*")  // 모든 origin 허용 (개발용)
+                .allowedOrigins(
+                        "http://localhost:8081",  // React Native 개발 서버
+                        "https://finz-site.shop",
+                        "https://api.finz-site.shop"
+                )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true)
