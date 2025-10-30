@@ -1,7 +1,9 @@
 package com.finz.controller;
 
 import com.finz.dto.GlobalResponseDto; // (GlobalResponseDto 경로)
+import com.finz.dto.home.CalendarResponseDto;
 import com.finz.dto.home.HomeDetailsResponseDto;
+import com.finz.dto.home.HomeHighlightResponseDto;
 import com.finz.dto.home.HomeSummaryResponseDto;
 import com.finz.service.HomeService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -63,6 +65,51 @@ public class HomeController {
                 .status(200)
                 .success(true)
                 .message("세부 내역 조회 성공")
+                .data(data)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/highlight")
+    @Operation(summary = "홈 화면 하이라이트 조회", description = "이번 주 하이라이트(지난주 대비)를 조회합니다.")
+    public ResponseEntity<GlobalResponseDto<HomeHighlightResponseDto>> getHomeHighlight(
+            @RequestParam("user_id") Long userId
+    ) {
+
+        // TODO: (보안) MVP 이후, Spring Security에서 인증된 ID를 가져오도록 수정.
+        log.info("홈 하이라이트 조회 요청 - userId: {}", userId);
+
+        HomeHighlightResponseDto data = homeService.getHomeHighlight(userId);
+
+        GlobalResponseDto<HomeHighlightResponseDto> response = GlobalResponseDto.<HomeHighlightResponseDto>builder()
+                .status(200)
+                .success(true)
+                .message("이번 주 하이라이트 조회 성공")
+                .data(data)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 홈 화면 달력 데이터 조회 (월별)
+     */
+    @GetMapping("/calendar")
+    @Operation(summary = "홈 화면 달력 데이터 조회", description = "월별 지출 상태(over/normal/none)를 조회합니다.")
+    public ResponseEntity<GlobalResponseDto<CalendarResponseDto>> getCalendarData(
+            @RequestParam("user_id") Long userId,
+            @RequestParam("year") int year,
+            @RequestParam("month") int month
+    ) {
+        // TODO: (보안) MVP 이후, Spring Security에서 인증된 ID를 가져오도록 수정.
+        log.info("달력 데이터 조회 요청 - userId: {}, year: {}, month: {}", userId, year, month);
+
+        CalendarResponseDto data = homeService.getCalendarData(userId, year, month);
+        GlobalResponseDto<CalendarResponseDto> response = GlobalResponseDto.<CalendarResponseDto>builder()
+                .status(200)
+                .success(true)
+                .message("달력 데이터 조회 성공")
                 .data(data)
                 .build();
 
