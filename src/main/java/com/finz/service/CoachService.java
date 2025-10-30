@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.finz.domain.expense.Expense;
 
 import java.time.LocalDate;
 import java.util.Collections;
@@ -282,7 +283,89 @@ public class CoachService {
                 .durationMonths(1)
                 .build();
         }
-        
+
         return null;
+    }
+
+    @Transactional
+    public CoachResponseDto processNewExpenseRecord(Long userId, Expense expense) {
+
+        log.info("[User: {}] 신규 지출 기록 처리 시작 - ExpenseId: {}", userId, expense.getId());
+
+        // 1. 지출 내역을 "USER" 메시지로 변환하여 DB 저장
+        String userContent = String.format(
+                "[지출 기록 📝] %s | %s | %,d원",
+                expense.getCategory().getDescription(), // "식비"
+                expense.getExpenseName(),             // "스타벅스"
+                expense.getAmount()                   // 5,000
+        );
+
+        CoachMessage userMsg = CoachMessage.builder()
+                .userId(userId)
+                .sender(MessageSender.USER)
+                .messageType(MessageType.EXPENSE_RECORD) // 새로운 타입 지정
+                .content(userContent)
+                .build();
+        messageRepository.save(userMsg);
+
+        // 2. AI 피드백 생성을 위한 컨텍스트(사용자) 수집
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        // 3. 지출 피드백 전용 시스템 프롬프트 생성
+        String systemPrompt = buildExpenseFeedbackPrompt(user, expense);
+
+        // 4. Gemini API 호출
+        // (즉각적인 피드백은 이전 대화 내역이 필요 없으므로 빈 리스트 전달)
+        String aiResponse = geminiClient.chat(
+                systemPrompt,
+                Collections.emptyList(),
+                userContent // 프롬프트에 이미 지출 내역이 있지만, chat 메서드 형식을 맞추기 위해 전달
+        );
+
+        // 5. AI 응답 DB 저장
+        CoachMessage aiMsg = CoachMessage.builder()
+                .userId(userId)
+                .sender(MessageSender.AI)
+                .messageType(MessageType.EXPENSE_RECORD)
+                .content(aiResponse)
+                .build();
+        messageRepository.save(aiMsg);
+
+        log.info("[User: {}] 지출 기록 피드백 생성 완료 - MessageId: {}", userId, aiMsg.getMessageId());
+
+        // 6. 생성된 AI 응답을 DTO로 빌드하여 ExpenseService로 반환
+        return CoachResponseDto.builder()
+                .message(aiResponse)
+                .messageType(MessageType.EXPENSE_RECORD)
+                .build();
+    }
+
+    private String buildExpenseFeedbackPrompt(User user, Expense expense) {
+        StringBuilder prompt = new StringBuilder();
+
+        prompt.append("당신은 FiNZ의 긍정적이고 격려하는 AI 재무 코치입니다.\n");
+        prompt.append("사용자가 방금 앱에 지출 내역을 기록했으며, 당신은 이 지출에 대해 **즉각적이고 짧은 피드백**을 제공해야 합니다.\n\n");
+
+        prompt.append("## 사용자 정보\n");
+        prompt.append(String.format("- 이름: %s\n", user.getNickname()));
+        prompt.append(String.format("- 월 목표 예산: %,d원\n\n", user.getMonthlyBudget()));
+
+        prompt.append("## 방금 기록된 지출\n");
+        prompt.append(String.format("- 카테고리: %s\n", expense.getCategory().getDescription()));
+        prompt.append(String.format("- 금액: %,d원\n", expense.getAmount()));
+        prompt.append(String.format("- 내용: %s\n\n", expense.getExpenseName()));
+
+        // (추후 고도화: 이 카테고리의 예산 대비 사용 현황을 여기에 추가하면 좋습니다)
+        // 예: prompt.append("- 현재 '식비' 예산의 70%를 사용했습니다.\n\n");
+
+        prompt.append("## 당신의 역할과 말투 (매우 중요)\n");
+        prompt.append("1. **긍정적이고 격려하는 톤**을 사용하세요. (예: '기록 완료! 꼼꼼하시네요 👍')\n");
+        prompt.append("2. **절대 비난하거나 지적하지 마세요.** (나쁜 예: '또 돈을 쓰셨네요.', '지출이 너무 많아요.')\n");
+        prompt.append("3. 한두 문장으로 **짧고 간결하게** 피드백하세요.\n");
+        prompt.append("4. 예산에 큰 영향을 주는 지출이라면 가볍게 주의를 환기시킬 수 있습니다. (예: '큰 지출이 있었네요! 월말까지 예산 관리 잘해봐요! 🔥')\n");
+        prompt.append("5. 이모지를 1~2개 사용하여 친근감을 표현하세요.\n");
+
+        return prompt.toString();
     }
 }

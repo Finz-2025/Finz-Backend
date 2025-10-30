@@ -2,6 +2,7 @@ package com.finz.service;
 
 import com.finz.domain.expense.Expense;
 import com.finz.domain.expense.ExpenseCategory;
+import com.finz.dto.coach.CoachResponseDto;
 import com.finz.repository.ExpenseRepository;
 import com.finz.domain.expense.PaymentMethod;
 import com.finz.dto.expense.CreateExpenseResponseDto;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExpenseService {
     private final ExpenseRepository expenseRepository;
     private final UserRepository userRepository;
+    private final CoachService coachService;
 
     @Transactional
     public CreateExpenseResponseDto createExpense(ExpenseRequestDto requestDto) {
@@ -42,7 +44,12 @@ public class ExpenseService {
 
         Expense savedExpense = expenseRepository.save(expense);
 
-        return new CreateExpenseResponseDto(savedExpense.getId());
+        CoachResponseDto aiFeedback = coachService.processNewExpenseRecord(
+                user.getId(),
+                savedExpense
+        );
+
+        return new CreateExpenseResponseDto(savedExpense.getId(), aiFeedback);
     }
 
     // 지출 내역 아이디로 지출 내역 조회하기

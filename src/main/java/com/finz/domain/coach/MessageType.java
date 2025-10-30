@@ -8,7 +8,8 @@ import lombok.RequiredArgsConstructor;
 public enum MessageType {
     GOAL_SETTING("목표 설정"),
     EXPENSE_ADVICE("지출 조언"),
-    FREE_CHAT("자유 대화");
-    
+    FREE_CHAT("자유 대화"),
+    EXPENSE_RECORD("지출 기록");
+
     private final String description;
 }
