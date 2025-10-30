@@ -54,7 +54,7 @@ public class GoalService {
         CoachMessage aiMsg = CoachMessage.builder()
             .userId(userId)
             .sender(MessageSender.AI)
-            .messageType(MessageType.GOAL_CONSULT)
+            .messageType(MessageType.GOAL_SETTING)
             .content(confirmMsg)
             .build();
         
