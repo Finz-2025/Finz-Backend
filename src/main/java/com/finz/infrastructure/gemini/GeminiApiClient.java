@@ -26,8 +26,8 @@ public class GeminiApiClient {
     
     private final RestTemplate restTemplate;
     
-    // 목표 설정 대화 첫 메시지 생성
-    public String generateInitialGoalMessage(String systemPrompt) {
+    // 대화 첫 메시지 생성 (범용)
+    public String generateInitialMessage(String systemPrompt) {
         
         List<GeminiRequest.Content> contents = new ArrayList<>();
         
@@ -41,7 +41,7 @@ public class GeminiApiClient {
         contents.add(GeminiRequest.Content.builder()
             .role("user")
             .parts(List.of(GeminiRequest.Part.builder()
-                .text("위 정보를 바탕으로 목표 설정 대화를 시작하는 첫 메시지를 작성해주세요.")
+                .text("위 정보를 바탕으로 대화를 시작하는 첫 메시지를 작성해주세요.")
                 .build()))
             .build());
         

@@ -35,6 +35,18 @@ public class CoachController {
         );
     }
     
+    // 지출 상담 요청
+    @PostMapping("/expense-consult/{userId}")
+    @Operation(summary = "지출 상담 요청", description = "AI 코치와 지출 패턴에 대한 대화를 시작합니다.")
+    public ResponseEntity<GlobalResponseDto<CoachResponseDto>> startExpenseConsult(
+            @PathVariable Long userId) {
+        log.info("지출 상담 요청 - userId: {}", userId);
+        
+        return ResponseEntity.ok(
+            coachService.requestExpenseConsult(userId)
+        );
+    }
+    
     // 메시지 전송 (대화 진행)
     @PostMapping("/message/{userId}")
     @Operation(summary = "메시지 전송", description = "사용자 메시지를 전송하고 AI 코치의 응답을 받습니다.")
