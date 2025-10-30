@@ -23,6 +23,22 @@ spring:
       ddl-auto: update
     open-in-view: false
 
+# Gemini API 설정
+gemini:
+  api:
+    key: ${GEMINI_API_KEY}
+    url: ${GEMINI_API_URL}
+
+# Swagger 설정
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  show-actuator: false
+
 management:
   endpoints:
     web:
