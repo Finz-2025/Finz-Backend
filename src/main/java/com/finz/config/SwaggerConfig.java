@@ -27,7 +27,7 @@ public class SwaggerConfig {
                                 .url("http://localhost:8080")
                                 .description("로컬 개발 서버"),
                         new Server()
-                                .url("https://api.finz.com")
+                                .url("https://api.finz-site.shop")
                                 .description("운영 서버")
                 ));
     }
