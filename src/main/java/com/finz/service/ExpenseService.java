@@ -2,6 +2,7 @@ package com.finz.service;
 
 import com.finz.domain.expense.Expense;
 import com.finz.domain.expense.ExpenseCategory;
+import com.finz.dto.coach.CoachResponseDto;
 import com.finz.repository.ExpenseRepository;
 import com.finz.domain.expense.PaymentMethod;
 import com.finz.dto.expense.CreateExpenseResponseDto;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExpenseService {
     private final ExpenseRepository expenseRepository;
     private final UserRepository userRepository;
+    private final CoachService coachService;
 
     @Transactional
     public CreateExpenseResponseDto createExpense(ExpenseRequestDto requestDto) {
@@ -31,7 +33,7 @@ public class ExpenseService {
 
         Expense expense = Expense.builder()
                 .user(user)
-                .expenseName(requestDto.getExpense_name())
+                .expenseName(requestDto.getExpense_name()) // (참고: title -> expenseName으로 사용 중이시네요)
                 .amount(requestDto.getAmount())
                 .category(category)
                 .expenseTag(requestDto.getExpense_tag())
@@ -41,6 +43,11 @@ public class ExpenseService {
                 .build();
 
         Expense savedExpense = expenseRepository.save(expense);
+
+        coachService.processNewExpenseRecord(
+                user.getId(),
+                savedExpense
+        );
 
         return new CreateExpenseResponseDto(savedExpense.getId());
     }
@@ -72,6 +79,7 @@ public class ExpenseService {
                 requestDto.getExpense_date()
         );
 
+        // 이 부분은 이미 aiFeedback 없이 expenseId만 반환하고 있었네요.
         return new CreateExpenseResponseDto(expense.getId());
     }
 
