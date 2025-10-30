@@ -70,4 +70,16 @@ public class Expense {
         this.paymentMethod = paymentMethod;
         this.expenseDate = expenseDate;
     }
+
+    public void update(String expenseName, Integer amount, ExpenseCategory category, String expenseTag,
+                       String memo, PaymentMethod paymentMethod, LocalDate expenseDate) {
+        this.expenseName = expenseName;
+        this.amount = amount;
+        this.category = category;
+        this.expenseTag = expenseTag;
+        this.memo = memo;
+        this.paymentMethod = paymentMethod;
+        this.expenseDate = expenseDate;
+        // this.updatedAt은 @LastModifiedDate가 자동으로 갱신
+    }
 }

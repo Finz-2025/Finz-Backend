@@ -53,4 +53,33 @@ public class ExpenseService {
 
         return ExpenseDetailResponseDto.from(expense);
     }
+
+    @Transactional
+    public CreateExpenseResponseDto updateExpense(Long expenseId, ExpenseRequestDto requestDto) {
+        Expense expense = expenseRepository.findById(expenseId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 지출 내역을 찾을 수 없습니다. id=" + expenseId));
+
+        ExpenseCategory category = ExpenseCategory.fromDescription(requestDto.getCategory());
+        PaymentMethod paymentMethod = PaymentMethod.fromDescription(requestDto.getPayment_method());
+
+        expense.update(
+                requestDto.getExpense_name(),
+                requestDto.getAmount(),
+                category,
+                requestDto.getExpense_tag(),
+                requestDto.getMemo(),
+                paymentMethod,
+                requestDto.getExpense_date()
+        );
+
+        return new CreateExpenseResponseDto(expense.getId());
+    }
+
+    @Transactional
+    public void deleteExpense(Long expenseId) {
+        Expense expense = expenseRepository.findById(expenseId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 지출 내역을 찾을 수 없습니다. id=" + expenseId));
+
+        expenseRepository.delete(expense);
+    }
 }
