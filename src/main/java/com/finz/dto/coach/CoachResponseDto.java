@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class CoachResponseDto {
-    private String message;
-    private MessageType messageType;
-    private GoalSuggestion suggestedGoal;  // nullable
+    private Long messageId;
+    private String aiResponse;
+    private String todayMission;  // 지출 상담용 (optional)
 }

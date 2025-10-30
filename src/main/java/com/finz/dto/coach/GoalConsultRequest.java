@@ -1,6 +1,5 @@
 package com.finz.dto.coach;
 
-import com.finz.domain.coach.MessageType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -8,8 +7,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class MessageRequest {
+public class GoalConsultRequest {
     private Long userId;
-    private String message;
-    private MessageType messageType;
+    private Long goalId;
 }
