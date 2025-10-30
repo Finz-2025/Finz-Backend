@@ -3,6 +3,7 @@ package com.finz.repository;
 import com.finz.domain.expense.Expense;
 import com.finz.domain.expense.ExpensePattern;
 import com.finz.domain.expense.TagExpenseSummary;
+import com.finz.domain.user.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -40,4 +41,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             @Param("tag") String tag,
             @Param("startDate") LocalDate startDate
     );
+
+    List<Expense> findByUserAndExpenseDate(User user, LocalDate date);
 }
