@@ -101,7 +101,7 @@ public class CoachService {
         log.debug("System Prompt: {}", systemPrompt);
 
         // 4. Gemini API 호출
-        String initialMessage = geminiClient.generateInitialGoalMessage(systemPrompt);
+        String initialMessage = geminiClient.generateInitialMessage(systemPrompt);
 
         // 5. 오늘의 미션 생성
         String todayMission = generateTodayMission(expenses);
@@ -151,7 +151,7 @@ public class CoachService {
         log.debug("System Prompt: {}", systemPrompt);
 
         // 5. Gemini API 호출
-        String initialMessage = geminiClient.generateInitialGoalMessage(systemPrompt);
+        String initialMessage = geminiClient.generateInitialMessage(systemPrompt);
 
         // 6. AI 첫 메시지 저장
         CoachMessage aiMessage = CoachMessage.builder()
